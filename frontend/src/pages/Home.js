@@ -1,9 +1,8 @@
-// import { useEffect } from "react"
-// import { useAuthContext } from "../hooks/useAuthContext"
+import { useAuthContext } from "../hooks/useAuthContext"
 
 const Home = () => {
     // global user state
-    // const {user} = useAuthContext()
+    const {user} = useAuthContext()
 
 //     useEffect(() => {
 //     const fetchWorkouts = async () => {
@@ -26,6 +25,7 @@ const Home = () => {
   return (
     <div className="home">
         <h1>Home</h1>
+        <h2>Welcome, {user.username}</h2>
     </div>
   )
 }
