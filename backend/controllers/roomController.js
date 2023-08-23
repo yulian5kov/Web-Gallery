@@ -27,6 +27,25 @@ const createRoom = async (req,res) => {
 
 }
 
+// DELETE a room
+// GOOD
+const deleteRoom = async (req, res) => {
+  const roomId = req.params.roomId;
+
+  try {
+      const room = await Room.findByIdAndDelete(roomId);
+
+      if (!room) {
+          return res.status(404).json({ error: 'Room not found' });
+      }
+
+      res.status(200).json({ message: 'Room deleted successfully' });
+  } catch (error) {
+      res.status(400).json({ error: error.message });
+  }
+};
+
+
 // Add Members to a Room
 // GOOD
 const addMembersToRoom = async (req, res) => {
@@ -50,7 +69,7 @@ const addMembersToRoom = async (req, res) => {
 };
 
 // Update Member Role
-// 
+// GOOD 
 const updateMemberRole = async (req, res) => {
     const { newRole } = req.body;
     const { roomId, memberId } = req.params;
@@ -114,5 +133,6 @@ module.exports = {
     addMembersToRoom,
     updateMemberRole,
     getRoomDetails,
-    getAllRooms
+    getAllRooms,
+    deleteRoom
 };

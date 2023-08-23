@@ -6,7 +6,8 @@ const {
     addMembersToRoom,
     updateMemberRole,
     getRoomDetails,
-    getAllRooms
+    getAllRooms,
+    deleteRoom
 } = require('../controllers/roomController.js')
 
 const requireAuth = require('../middleware/requireAuth')
@@ -19,16 +20,19 @@ router.use(requireAuth)
 // POST a new room
 router.post('/', createRoom)
 
-// Add Members to a Room
+// ADD Members to a Room
 router.patch('/:roomId', addMembersToRoom)
 
-// Update Member Role
+// UPDATE Member Role
 router.patch('/:roomId/member/:memberId', updateMemberRole)
 
-// Get Room Details
+// GET Room Details
 router.get('/:roomId', getRoomDetails)
 
-// Get All Rooms
+// GET All Rooms
 router.get('/', getAllRooms)
+
+// DELETE a Rooms
+router.delete('/:roomId', deleteRoom)
 
 module.exports = router
