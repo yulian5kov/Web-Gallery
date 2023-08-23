@@ -1,24 +1,14 @@
 const Room = require('../models/roomModel')
 
-// login user
+// CREATE a room
+// GOOD
 const createRoom = async (req,res) => {
-    const {title, description, privacy, owner, members} = req.body
+    const { title } = req.body;
+    const creatorId = req.user._id; // Logged-in user's ID
 
     let emptyFields = []
     if(!title){
         emptyFields.push('title')
-    }
-    if(!description){
-        emptyFields.push('description')
-    }
-    if(!privacy){
-        emptyFields.push('privacy')
-    }
-    if(!owner){
-        emptyFields.push('owner')
-    }
-    if(!members){
-        emptyFields.push('members')
     }
     if(emptyFields.length > 0){
         return res.status(400).json({error: "Please fill in all the fields", emptyFields})
@@ -26,8 +16,10 @@ const createRoom = async (req,res) => {
 
     // add to the database
     try {
-        
-        const room = await Room.create({ title, description, privacy, owner, members })
+        const room = await Room.create({ 
+            title,
+            members: [{user: creatorId, role: 'owner'}]  // Creator is added as an owner
+        })
         res.status(200).json(room)
     } catch (error) {
         res.status(400).json({ error: error.message })
@@ -35,4 +27,92 @@ const createRoom = async (req,res) => {
 
 }
 
-module.exports = {createRoom}
+// Add Members to a Room
+// GOOD
+const addMembersToRoom = async (req, res) => {
+    const { members } = req.body;
+    const roomId = req.params.roomId;
+  
+    try {
+      const room = await Room.findById(roomId);
+  
+      if (!room) {
+        return res.status(404).json({ error: 'Room not found' });
+      }
+  
+      room.members.push(...members);
+      await room.save();
+  
+      res.status(200).json(room);
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
+};
+
+// Update Member Role
+// 
+const updateMemberRole = async (req, res) => {
+    const { newRole } = req.body;
+    const { roomId, memberId } = req.params;
+  
+    try {
+      const room = await Room.findById(roomId);
+  
+      if (!room) {
+        return res.status(404).json({ error: 'Room not found' });
+      }
+  
+      const member = room.members.id(memberId);
+      if (!member) {
+        return res.status(404).json({ error: 'Member not found in room' });
+      }
+  
+      member.role = newRole;
+      await room.save();
+  
+      res.status(200).json(room);
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
+};
+  
+// Get Room Details
+// GOOD
+const getRoomDetails = async (req, res) => {
+  const roomId = req.params.roomId;
+
+  try {
+      console.log('Fetching room with ID:', roomId);
+      const room = await Room.findById(roomId);
+
+      if (!room) {
+        console.log('Room not found');
+        return res.status(404).json({ error: 'Room not found' });
+      }
+
+      console.log('Found room:', room);
+      res.status(200).json(room);
+  } catch (error) {
+      console.error('Error fetching room:', error);
+      res.status(400).json({ error: error.message });
+  }
+};
+
+// Get All Rooms
+// GOOD
+const getAllRooms = async (req, res) => {
+    try {
+      const rooms = await Room.find();
+      res.status(200).json(rooms);
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
+};
+  
+module.exports = {
+    createRoom,
+    addMembersToRoom,
+    updateMemberRole,
+    getRoomDetails,
+    getAllRooms
+};

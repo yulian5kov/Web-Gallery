@@ -1,19 +1,34 @@
 const express = require('express')
 
 // controller functions
-const {createRoom} = require('../controllers/roomController.js')
+const {
+    createRoom,
+    addMembersToRoom,
+    updateMemberRole,
+    getRoomDetails,
+    getAllRooms
+} = require('../controllers/roomController.js')
+
+const requireAuth = require('../middleware/requireAuth')
 
 const router = express.Router()
 
+// require auth for all workout routes
+router.use(requireAuth)
+
 // POST a new room
-router.post('/create', createRoom)
+router.post('/', createRoom)
 
-// GET all rooms
+// Add Members to a Room
+router.patch('/:roomId', addMembersToRoom)
 
-// GET a single room by ID
+// Update Member Role
+router.patch('/:roomId/member/:memberId', updateMemberRole)
 
-// PUT (update) a room by ID
+// Get Room Details
+router.get('/:roomId', getRoomDetails)
 
-// DELETE a room by ID
+// Get All Rooms
+router.get('/', getAllRooms)
 
 module.exports = router
