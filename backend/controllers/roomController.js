@@ -32,14 +32,23 @@ const createRoom = async (req,res) => {
 const deleteRoom = async (req, res) => {
   const roomId = req.params.roomId;
 
+  const userId = req.user._id;
+
   try {
-      const room = await Room.findByIdAndDelete(roomId);
+      const room = await Room.findById(roomId);
 
       if (!room) {
-          return res.status(404).json({ error: 'Room not found' });
+        return res.status(404).json({ error: 'Room not found' });
       }
 
-      res.status(200).json({ message: 'Room deleted successfully' });
+      // Check if the user is the owner of the room
+      if (room.members.some(member => member.user.toString() === userId && member.role === 'owner')) {
+        // User is the owner, allow deletion
+        await room.remove();
+        return res.status(200).json({ message: 'Room deleted successfully' });
+      }else{
+        return res.status(403).json({ error: 'You do not have permission to delete this room' });
+      }
   } catch (error) {
       res.status(400).json({ error: error.message });
   }
@@ -85,7 +94,12 @@ const addMembersToRoom = async (req, res) => {
     const roomId = req.params.roomId;
   
     try {
-      const room = await Room.findById(roomId);
+      const room = await Room.findById(roomId)
+        .populate({
+        path: 'members.user',
+        select: 'username' // Fetch only the username field
+      })
+        .exec();
   
       if (!room) {
         return res.status(404).json({ error: 'Room not found' });
@@ -133,18 +147,19 @@ const getRoomDetails = async (req, res) => {
   const roomId = req.params.roomId;
 
   try {
-      console.log('Fetching room with ID:', roomId);
-      const room = await Room.findById(roomId);
+      const room = await Room.findById(roomId)
+        .populate({
+          path: 'members.user',
+          select: 'username' // Fetch only the username field
+        })
+        .exec();
 
       if (!room) {
-        console.log('Room not found');
         return res.status(404).json({ error: 'Room not found' });
       }
 
-      console.log('Found room:', room);
       res.status(200).json(room);
   } catch (error) {
-      console.error('Error fetching room:', error);
       res.status(400).json({ error: error.message });
   }
 };
@@ -159,6 +174,58 @@ const getAllRooms = async (req, res) => {
       res.status(400).json({ error: error.message });
     }
 };
+
+// DELETE members (owner only)
+// GOOD
+const deleteMembers = async (req, res) => {
+  const { membersToDelete } = req.body;
+  const roomId = req.params.roomId;
+
+  try {
+    const room = await Room.findById(roomId);
+
+    if (!room) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+
+    // Check if the requester is the owner
+    const requesterId = req.user._id;
+    const owner = room.members.find(member => member.role === 'owner');
+    if (owner.user.toString() !== requesterId.toString()) {
+      return res.status(403).json({ error: 'Permission denied' });
+    }
+
+    const deletedMembers = [];
+    const notFoundMembers = [];
+
+    for (const memberId of membersToDelete) {
+      const memberIndex = room.members.findIndex(member => member._id.toString() === memberId);
+      if (memberIndex !== -1) {
+        const deletedMember = room.members.splice(memberIndex, 1)[0];
+        deletedMembers.push({
+          memberId: deletedMember._id,
+          userId: deletedMember.user._id,
+          username: deletedMember.user.username
+        });
+      } else {
+        notFoundMembers.push(memberId);
+      }
+    }
+
+    await room.save();
+
+    res.status(200).json({ message: 'Members deleted successfully', deletedMembers, notFoundMembers });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
+
+
+
+
+
+
   
 module.exports = {
     createRoom,
@@ -167,5 +234,6 @@ module.exports = {
     getRoomDetails,
     getAllRooms,
     deleteRoom,
-    duplicateRoom
+    duplicateRoom,
+    deleteMembers
 };
