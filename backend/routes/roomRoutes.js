@@ -7,7 +7,8 @@ const {
     updateMemberRole,
     getRoomDetails,
     getAllRooms,
-    deleteRoom
+    deleteRoom,
+    duplicateRoom
 } = require('../controllers/roomController.js')
 
 const requireAuth = require('../middleware/requireAuth')
@@ -34,5 +35,8 @@ router.get('/', getAllRooms)
 
 // DELETE a Rooms
 router.delete('/:roomId', deleteRoom)
+
+// DUPLICATE a Room
+router.post('/:roomId/duplicate', duplicateRoom)
 
 module.exports = router

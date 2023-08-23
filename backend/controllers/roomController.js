@@ -45,6 +45,38 @@ const deleteRoom = async (req, res) => {
   }
 };
 
+// DUPLICATE a room
+// GOOD
+const duplicateRoom = async (req, res) => {
+  const roomIdToDuplicate = req.params.roomId;
+  const changes = req.body;
+
+  try {
+      // Find the room to duplicate
+      const roomToDuplicate = await Room.findById(roomIdToDuplicate);
+
+      if (!roomToDuplicate) {
+          return res.status(404).json({ error: 'Room not found' });
+      }
+
+      // Duplicate the room with optional changes
+      const duplicatedRoom = new Room({
+          title: changes.title || roomToDuplicate.title, // Keep original title if not changed
+          members: roomToDuplicate.members.map(member => ({
+              user: member.user,
+              role: member.role
+          })), // Duplicate members as well
+          ...changes // Apply other changes from the request body
+      });
+
+      await duplicatedRoom.save();
+
+      res.status(200).json(duplicatedRoom);
+  } catch (error) {
+      res.status(400).json({ error: error.message });
+  }
+};
+
 
 // Add Members to a Room
 // GOOD
@@ -134,5 +166,6 @@ module.exports = {
     updateMemberRole,
     getRoomDetails,
     getAllRooms,
-    deleteRoom
+    deleteRoom,
+    duplicateRoom
 };
