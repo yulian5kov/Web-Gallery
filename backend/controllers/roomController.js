@@ -3,7 +3,7 @@ const Room = require('../models/roomModel')
 // CREATE a room
 // GOOD
 const createRoom = async (req,res) => {
-    const { title } = req.body;
+    const { title, members } = req.body;
     const creatorId = req.user._id; // Logged-in user's ID
 
     let emptyFields = []
@@ -14,11 +14,22 @@ const createRoom = async (req,res) => {
         return res.status(400).json({error: "Please fill in all the fields", emptyFields})
     }
 
+    let roomMembers = [{ user: creatorId, role: 'owner' }]; // Always include the creator as owner
+
+    if (members && Array.isArray(members)) {
+      // If members array is provided and is an array
+      members.forEach(member => {
+          if (member.user && member.role) {
+              roomMembers.push(member);
+          }
+      });
+  }
+
     // add to the database
     try {
         const room = await Room.create({ 
             title,
-            members: [{user: creatorId, role: 'owner'}]  // Creator is added as an owner
+            members: roomMembers
         })
         res.status(200).json(room)
     } catch (error) {
@@ -31,22 +42,30 @@ const createRoom = async (req,res) => {
 // GOOD
 const deleteRoom = async (req, res) => {
   const roomId = req.params.roomId;
-
   const userId = req.user._id;
 
   try {
-      const room = await Room.findById(roomId);
+      const foundRoom = await Room.findById(roomId); // Rename the variable here
 
-      if (!room) {
+      if (!foundRoom) {
         return res.status(404).json({ error: 'Room not found' });
       }
 
-      // Check if the user is the owner of the room
-      if (room.members.some(member => member.user.toString() === userId && member.role === 'owner')) {
-        // User is the owner, allow deletion
-        await room.remove();
+      // Find the member in the room with the given user ID
+      const memberWithUserId = foundRoom.members.find(member => {
+        return member.user._id.toString() === userId.toString();
+      });
+      
+      if (!memberWithUserId) {
+        return res.status(403).json({ error: 'You do not have permission to delete this room' });
+      }
+
+      const isOwner = memberWithUserId.role === 'owner';
+      
+      if (isOwner) {
+        await foundRoom.deleteOne();
         return res.status(200).json({ message: 'Room deleted successfully' });
-      }else{
+      } else {
         return res.status(403).json({ error: 'You do not have permission to delete this room' });
       }
   } catch (error) {
@@ -168,7 +187,9 @@ const getRoomDetails = async (req, res) => {
 // GOOD
 const getAllRooms = async (req, res) => {
     try {
-      const rooms = await Room.find();
+      const rooms = await Room.find()
+        .populate('members.user', 'username') // Populate user's username from the 'User' collection
+        .exec();
       res.status(200).json(rooms);
     } catch (error) {
       res.status(400).json({ error: error.message });
