@@ -51,6 +51,55 @@ const createRoom = async (req, res) => {
   }
 };
 
+// UPDATE Room Title
+const updateRoom = async (req, res) => {
+  const { roomId } = req.params;
+  const { title } = req.body;
+  const loggedInUserId = req.user._id; // Assuming user ID is available in req.user
+
+  try {
+    const room = await Room.findById(roomId);
+    if (!room) {
+      return res.status(404).json({ error: "Room not found" });
+    }
+
+    const member = room.members.find((member) =>
+      member.user._id.equals(loggedInUserId)
+    );
+    if (!member) {
+      return res
+        .status(403)
+        .json({ error: "You do not have permission to update this room" });
+    }
+
+    // Check if the requester is the owner or admin
+    if (member.role === "owner" || member.role === "admin") {
+      room.title = title;
+      await room.save();
+
+      const formattedRoom = {
+        roomID: room._id,
+        title: room.title,
+        members: room.members.map((member) => ({
+          userID: member.user._id,
+          username: member.user.username,
+          memberID: member._id,
+          role: member.role,
+        })),
+        __v: room.__v,
+      };
+
+      res.status(200).json(formattedRoom);
+    } else {
+      res
+        .status(403)
+        .json({ error: "Only the owner and admin can update the room title" });
+    }
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
 // DELETE a room
 const deleteRoom = async (req, res) => {
   const roomId = req.params.roomId;
@@ -277,49 +326,73 @@ const getAllRooms = async (req, res) => {
 
 // DELETE members (owner only)
 const deleteMembers = async (req, res) => {
-  const { membersToDelete } = req.body;
   const roomId = req.params.roomId;
+  const userId = req.user._id;
+  const targetId = req.params.userId; // Accepts user ID
 
   try {
-    const room = await Room.findById(roomId);
+    const foundRoom = await Room.findById(roomId);
 
-    if (!room) {
+    if (!foundRoom) {
       return res.status(404).json({ error: "Room not found" });
     }
 
-    // Check if the requester is the owner
-    const requesterId = req.user._id;
-    const owner = room.members.find((member) => member.role === "owner");
-    if (owner.user.toString() !== requesterId.toString()) {
-      return res.status(403).json({ error: "Permission denied" });
-    }
-
-    const deletedMembers = [];
-    const notFoundMembers = [];
-
-    for (const memberId of membersToDelete) {
-      const memberIndex = room.members.findIndex(
-        (member) => member._id.toString() === memberId
-      );
-      if (memberIndex !== -1) {
-        const deletedMember = room.members.splice(memberIndex, 1)[0];
-        deletedMembers.push({
-          memberId: deletedMember._id,
-          userId: deletedMember.user._id,
-          username: deletedMember.user.username,
-        });
-      } else {
-        notFoundMembers.push(memberId);
-      }
-    }
-
-    await room.save();
-
-    res.status(200).json({
-      message: "Members deleted successfully",
-      deletedMembers,
-      notFoundMembers,
+    const requesterMember = foundRoom.members.find((member) => {
+      return member.user._id.toString() === userId.toString();
     });
+
+    if (!requesterMember) {
+      return res.status(403).json({
+        error: "You do not have permission to delete members from this room",
+      });
+    }
+
+    // Check if the requester is an owner
+    const isRequesterOwner = requesterMember.role === "owner";
+
+    // Check if the target is the requester themselves
+    const isDeletingSelf = targetId === userId.toString();
+
+    // Find the member using either member ID or user ID
+    const targetMember = foundRoom.members.find((member) => {
+      return (
+        member.user._id.toString() === targetId.toString() ||
+        member._id.toString() === targetId.toString()
+      );
+    });
+
+    if (!targetMember) {
+      return res.status(404).json({ error: "Member not found in this room" });
+    }
+
+    if (isRequesterOwner || isDeletingSelf) {
+      // Check if there's another owner in the room
+      const otherOwners = foundRoom.members.filter((member) => {
+        return (
+          member.role === "owner" &&
+          member.user._id.toString() !== userId.toString()
+        );
+      });
+
+      if (isRequesterOwner && otherOwners.length === 0) {
+        return res
+          .status(403)
+          .json({ error: "Cannot delete owner without another owner present" });
+      }
+
+      // Perform the deletion
+      foundRoom.members = foundRoom.members.filter((member) => {
+        return member._id.toString() !== targetMember._id.toString();
+      });
+
+      await foundRoom.save();
+
+      return res.status(200).json({ message: "Member deleted successfully" });
+    } else {
+      return res
+        .status(403)
+        .json({ error: "You do not have permission to delete this member" });
+    }
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -327,6 +400,7 @@ const deleteMembers = async (req, res) => {
 
 module.exports = {
   createRoom,
+  updateRoom,
   addMembersToRoom,
   updateMemberRole,
   getRoomDetails,
